@@ -14,17 +14,6 @@ const TOOLS = [
     description: "列出仓库中所有可用的 emoji 文件名",
     inputSchema: { type: "object", properties: {}, required: [] },
   },
-  {
-    name: "get_emoji",
-    description: "根据文件名获取 emoji 图片，返回 base64 编码的 PNG 图片",
-    inputSchema: {
-      type: "object",
-      properties: {
-        filename: { type: "string", description: "emoji 文件名，例如 smile.png" },
-      },
-      required: ["filename"],
-    },
-  },
 ];
 
 function jsonRpcOk(id: string | number, result: unknown) {
@@ -47,42 +36,12 @@ async function listEmoji(): Promise<string[]> {
     .map((f) => f.path);
 }
 
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  const chunks: string[] = [];
-  for (let i = 0; i < bytes.length; i += 8192) {
-    chunks.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
-  }
-  return btoa(chunks.join(""));
-}
-
-async function getEmoji(filename: string): Promise<{ data: string; mimeType: string }> {
-  const url = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${encodeURIComponent(filename)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Image not found: ${filename}`);
-  const buf = await res.arrayBuffer();
-  return { data: arrayBufferToBase64(buf), mimeType: "image/png" };
-}
-
 async function handleToolCall(id: string | number, params: { name: string; arguments?: Record<string, unknown> }) {
   try {
     if (params.name === "list_emoji") {
       const names = await listEmoji();
       return jsonRpcOk(id, {
         content: [{ type: "text", text: names.join("\n") }],
-      });
-    }
-    if (params.name === "get_emoji") {
-      const filename = params.arguments?.filename as string;
-      if (!filename) {
-        return jsonRpcOk(id, {
-          content: [{ type: "text", text: "Error: filename is required" }],
-          isError: true,
-        });
-      }
-      const img = await getEmoji(filename);
-      return jsonRpcOk(id, {
-        content: [{ type: "image", data: img.data, mimeType: img.mimeType }],
       });
     }
     return jsonRpcError(id, -32602, `Unknown tool: ${params.name}`);
